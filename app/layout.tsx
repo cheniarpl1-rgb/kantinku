@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import Navbar from "@/components/Navbar"; // <-- Impor Navbar di sini
+import Navbar from "@/components/Navbar";
 
 export const metadata: Metadata = {
   title: "KantinKu",
@@ -15,8 +15,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body>
-        <Navbar />{" "}
-        {/* <-- Panggil Navbar di sini agar tampil di semua halaman */}
+        <Navbar />
         <main className="p-4">{children}</main>
       </body>
     </html>
