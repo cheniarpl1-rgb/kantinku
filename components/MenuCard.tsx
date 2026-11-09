@@ -1,60 +1,107 @@
+"use client";
+
 import Link from "next/link";
 import { Menu } from "@/data/menu";
+import { useState, useEffect } from "react";
 
 interface MenuCardProps {
   item: Menu;
 }
 
 export default function MenuCard({ item }: MenuCardProps) {
-  const isAvailable = item.stok > 0;
+  const isHabis = item.stok <= 0;
+  const [isFavorit, setIsFavorit] = useState<boolean>(false);
+  const [mounted, setMounted] = useState<boolean>(false);
+
+  useEffect(() => {
+    setMounted(true);
+    try {
+      const savedFav = localStorage.getItem("favorit");
+      if (savedFav) {
+        const favIds: number[] = JSON.parse(savedFav);
+        setIsFavorit(favIds.includes(item.id));
+      }
+    } catch {}
+  }, [item.id]);
+
+  const toggleFavorit = (e: React.MouseEvent) => {
+    e.preventDefault();
+    try {
+      const savedFav = localStorage.getItem("favorit");
+      let favIds: number[] = savedFav ? JSON.parse(savedFav) : [];
+
+      if (isFavorit) {
+        favIds = favIds.filter((favId) => favId !== item.id);
+        setIsFavorit(false);
+      } else {
+        favIds.push(item.id);
+        setIsFavorit(true);
+      }
+      localStorage.setItem("favorit", JSON.stringify(favIds));
+    } catch {}
+  };
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm hover:shadow-xl border border-gray-100 transition-all duration-300 overflow-hidden flex flex-col justify-between group">
-      {/* Visual Header / Thumbnail */}
-      <div className="h-36 bg-gradient-to-br from-orange-100 to-amber-50 flex items-center justify-center relative overflow-hidden">
-        <span className="text-4xl transform group-hover:scale-110 transition duration-300">
+    <div
+      className={`bg-white rounded-3xl border border-gray-200/80 shadow-sm overflow-hidden flex flex-col justify-between transition hover:shadow-md relative ${isHabis ? "opacity-60 bg-gray-50" : ""}`}
+    >
+      {/* Tombol Favorit */}
+      <button
+        onClick={toggleFavorit}
+        className="absolute top-3 right-3 z-10 w-9 h-9 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center shadow border border-gray-100 text-lg transition hover:scale-110"
+        title="Tandai Favorit"
+      >
+        {mounted && isFavorit ? "❤️" : "🤍"}
+      </button>
+
+      {/* Pastikan href menggunakan item.id yang benar */}
+      <Link href={`/menu/${item.id}`} className="block">
+        <div className="h-44 bg-orange-50 flex items-center justify-center text-5xl relative">
           {item.kategori === "Makanan"
             ? "🍲"
             : item.kategori === "Minuman"
               ? "🥤"
               : "🍿"}
-        </span>
-        <span className="absolute top-3 right-3 bg-white/80 backdrop-blur-md text-gray-700 text-xs font-semibold px-2.5 py-1 rounded-full shadow-sm">
-          {item.kategori}
-        </span>
-      </div>
-
-      {/* Konten Kartu */}
-      <div className="p-5 flex-1 flex flex-col justify-between">
-        <div>
-          <h3 className="font-bold text-lg text-gray-800 group-hover:text-orange-600 transition mb-1">
+          {isHabis && (
+            <span className="absolute inset-0 bg-gray-900/40 backdrop-blur-[2px] flex items-center justify-center text-white font-black text-sm tracking-widest uppercase">
+              Habis
+            </span>
+          )}
+        </div>
+        <div className="p-5">
+          <div className="flex justify-between items-start mb-1">
+            <span className="text-[11px] font-extrabold uppercase tracking-wider text-orange-600 bg-orange-50 px-2.5 py-0.5 rounded-full">
+              {item.kategori}
+            </span>
+            <span className="text-xs font-bold text-gray-400">
+              Stok: {item.stok}
+            </span>
+          </div>
+          <h2 className="font-extrabold text-gray-900 text-base mt-2 line-clamp-1">
             {item.nama}
-          </h3>
-          <p className="text-2xl font-extrabold text-orange-500 mb-4">
+          </h2>
+          <p className="text-orange-600 font-black text-lg mt-1">
             Rp {item.harga.toLocaleString("id-ID")}
           </p>
         </div>
+      </Link>
 
-        <div className="pt-3 border-t border-gray-100 flex items-center justify-between mt-2">
-          {/* Badge Stok */}
-          <span
-            className={`text-xs px-3 py-1 rounded-full font-medium ${
-              isAvailable
-                ? "bg-emerald-50 text-emerald-600 border border-emerald-200"
-                : "bg-rose-50 text-rose-600 border border-rose-200"
-            }`}
+      <div className="px-5 pb-5 pt-0">
+        {isHabis ? (
+          <button
+            disabled
+            className="w-full bg-gray-200 text-gray-400 font-bold py-2.5 rounded-xl text-xs cursor-not-allowed"
           >
-            {isAvailable ? `Stok: ${item.stok}` : "Habis"}
-          </span>
-
-          {/* Tombol Detail */}
+            Stok Habis
+          </button>
+        ) : (
           <Link
             href={`/menu/${item.id}`}
-            className="text-xs font-semibold text-orange-600 hover:text-orange-700 flex items-center gap-1 group-hover:translate-x-1 transition"
+            className="block text-center w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-sm"
           >
-            Detail &rarr;
+            Lihat Detail
           </Link>
-        </div>
+        )}
       </div>
     </div>
   );

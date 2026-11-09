@@ -168,8 +168,10 @@ function DetailContent() {
                     </button>
                     <span className="w-10 text-center font-bold">{jumlah}</span>
                     <button
-                      onClick={() => setJumlah(jumlah + 1)}
-                      className="w-8 h-8 rounded-lg bg-gray-100 font-bold"
+                      onClick={() =>
+                        setJumlah(Math.min(menuItem.stok, jumlah + 1))
+                      }
+                      className="w-8 h-8 rounded-lg bg-gray-100 font-bold hover:bg-gray-200 transition"
                     >
                       +
                     </button>

@@ -20,3 +20,7 @@ export const menu: Menu[] = [
   { id: 5, nama: "Pisang Goreng", kategori: "Camilan", harga: 5000, stok: 20 },
   { id: 6, nama: "Risol Mayo", kategori: "Camilan", harga: 4000, stok: 3 },
 ];
+
+export function rupiah(n: number) {
+  return "Rp " + n.toLocaleString("id-ID");
+}

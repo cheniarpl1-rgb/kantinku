@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { menu } from "@/data/menu";
 
@@ -9,60 +9,39 @@ interface CartItem {
   jumlah: number;
 }
 
-interface StrukItem {
-  nama: string;
-  jumlah: number;
-  harga: number;
-}
-
-interface StrukData {
-  tanggal: string;
-  nama: string;
-  kelas: string;
-  tipe: string;
-  items: StrukItem[];
-  subtotal: number;
-  diskon: number;
-  ongkir: number;
-  total: number;
-}
-
 export default function KeranjangPage() {
-  // Inisialisasi state langsung dari localStorage (tanpa useEffect untuk memuat data)
-  const [cart, setCart] = useState<CartItem[]>(() => {
+  const [mounted, setMounted] = useState<boolean>(false);
+  const [cart, setCart] = useState<CartItem[]>([]);
+  const [nama, setNama] = useState("");
+  const [kelas, setKelas] = useState("");
+  const [tipe, setTipe] = useState("Ambil Sendiri");
+  const [sukses, setSukses] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
     try {
       const saved = localStorage.getItem("keranjang");
-      return saved ? JSON.parse(saved) : [];
-    } catch {
-      return [];
-    }
-  });
+      if (saved) {
+        setCart(JSON.parse(saved));
+      }
+    } catch {}
+  }, []);
 
-  const [promoKode, setPromoKode] = useState("");
-  const [diskon, setDiskon] = useState(0);
-  const [pesanPromo, setPesanPromo] = useState<{
-    tipe: "sukses" | "error";
-    teks: string;
-  } | null>(null);
-
-  const [tipePengiriman, setTipePengiriman] = useState<"pickup" | "delivery">(
-    "pickup",
-  );
-  const [namaPemesan, setNamaPemesan] = useState("");
-  const [kelasPemesan, setKelasPemesan] = useState("");
-  const [pesanCheckout, setPesanCheckout] = useState<{
-    tipe: "sukses" | "error";
-    teks: string;
-  } | null>(null);
-  const [struk, setStruk] = useState<StrukData | null>(null);
+  if (!mounted) {
+    return (
+      <main className="max-w-4xl mx-auto py-10 px-4 text-center">
+        <p className="text-gray-500 text-sm">Memuat keranjang...</p>
+      </main>
+    );
+  }
 
   const updateJumlah = (id: number, delta: number) => {
     const updated = cart.map((item) => {
       if (item.id === id) {
         const menuItem = menu.find((m) => m.id === id);
-        const stokMaks = menuItem ? menuItem.stok : 99;
-        const newQty = Math.max(1, item.jumlah + delta);
-        return { ...item, jumlah: Math.min(newQty, stokMaks) };
+        const maxStok = menuItem ? menuItem.stok : 99;
+        const newJumlah = Math.max(1, Math.min(maxStok, item.jumlah + delta));
+        return { ...item, jumlah: newJumlah };
       }
       return item;
     });
@@ -71,170 +50,82 @@ export default function KeranjangPage() {
     window.dispatchEvent(new Event("keranjang-berubah"));
   };
 
-  const hapusItem = (id: number) => {
+  const removeItem = (id: number) => {
     const updated = cart.filter((item) => item.id !== id);
     setCart(updated);
     localStorage.setItem("keranjang", JSON.stringify(updated));
     window.dispatchEvent(new Event("keranjang-berubah"));
   };
 
-  const subtotal = cart.reduce((acc, item) => {
+  const totalHarga = cart.reduce((acc, item) => {
     const menuItem = menu.find((m) => m.id === item.id);
     return acc + (menuItem ? menuItem.harga * item.jumlah : 0);
   }, 0);
 
-  const ongkir = tipePengiriman === "delivery" ? 2000 : 0;
+  const handleCheckout = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (cart.length === 0) return;
 
-  const handleTerapkanPromo = () => {
-    setPesanPromo(null);
-    const kodeBersih = promoKode.trim().toUpperCase();
-
-    if (kodeBersih === "") {
-      setDiskon(0);
-      return;
-    }
-
-    if (kodeBersih === "HEMAT10") {
-      if (subtotal >= 20000) {
-        const diskonNilai = Math.round(subtotal * 0.1);
-        setDiskon(diskonNilai);
-        setPesanPromo({
-          tipe: "sukses",
-          teks: "Promo HEMAT10 dipakai: diskon 10%.",
-        });
-      } else {
-        setDiskon(0);
-        setPesanPromo({
-          tipe: "error",
-          teks: "Promo HEMAT10 butuh belanja minimal Rp 20.000.",
-        });
-      }
-    } else {
-      setDiskon(0);
-      setPesanPromo({ tipe: "error", teks: "Kode promo tidak dikenal." });
-    }
-  };
-
-  const handlePesanSekarang = () => {
-    setPesanCheckout(null);
-    if (namaPemesan.trim().length < 3) {
-      setPesanCheckout({
-        tipe: "error",
-        teks: "Nama pemesan minimal 3 huruf.",
-      });
-      return;
-    }
-    if (tipePengiriman === "delivery" && kelasPemesan.trim().length < 3) {
-      setPesanCheckout({
-        tipe: "error",
-        teks: "Kelas wajib diisi minimal 3 karakter.",
-      });
-      return;
-    }
-    if (cart.length === 0) {
-      setPesanCheckout({ tipe: "error", teks: "Keranjang masih kosong." });
-      return;
-    }
-
-    const diskonFinal = subtotal < 20000 ? 0 : diskon;
-    const totalBayar = subtotal - diskonFinal + ongkir;
-    const detailPesanan: StrukData = {
+    const pesananBaru = {
       tanggal: new Date().toLocaleString("id-ID"),
-      nama: namaPemesan,
-      kelas: kelasPemesan,
-      tipe: tipePengiriman === "delivery" ? "Diantar" : "Ambil Sendiri",
-      items: cart.map((i) => {
-        const m = menu.find((item) => item.id === i.id);
+      nama,
+      kelas,
+      tipe,
+      items: cart.map((item) => {
+        const menuItem = menu.find((m) => m.id === item.id);
         return {
-          nama: m?.nama ?? "Menu",
-          jumlah: i.jumlah,
-          harga: m?.harga ?? 0,
+          nama: menuItem ? menuItem.nama : "Menu",
+          jumlah: item.jumlah,
+          harga: menuItem ? menuItem.harga : 0,
         };
       }),
-      subtotal,
-      diskon: diskonFinal,
-      ongkir,
-      total: totalBayar,
+      total: totalHarga,
     };
 
     try {
-      const riwayatLama = localStorage.getItem("riwayat");
-      const listRiwayat = riwayatLama ? JSON.parse(riwayatLama) : [];
-      listRiwayat.unshift(detailPesanan);
-      localStorage.setItem("riwayat", JSON.stringify(listRiwayat));
-    } catch {}
+      const savedRiwayat = localStorage.getItem("riwayat");
+      const riwayatList = savedRiwayat ? JSON.parse(savedRiwayat) : [];
+      riwayatList.unshift(pesananBaru);
+      localStorage.setItem("riwayat", JSON.stringify(riwayatList));
 
-    setStruk(detailPesanan);
-    setCart([]);
-    localStorage.removeItem("keranjang");
-    setDiskon(0);
-    setPromoKode("");
-    setNamaPemesan("");
-    setKelasPemesan("");
-    window.dispatchEvent(new Event("keranjang-berubah"));
+      localStorage.removeItem("keranjang");
+      setCart([]);
+      window.dispatchEvent(new Event("keranjang-berubah"));
+      setSukses(true);
+    } catch {}
   };
 
-  if (struk) {
+  if (sukses) {
     return (
-      <main className="max-w-2xl mx-auto py-10 px-4">
-        <div className="bg-white rounded-3xl border border-gray-200 shadow-lg p-8 text-center space-y-6">
-          <div className="text-6xl">🎉</div>
-          <h1 className="text-2xl font-black text-gray-900">
-            Terima kasih, {struk.nama}!
-          </h1>
-
-          <div className="bg-gray-50 rounded-2xl p-6 text-left space-y-3 text-sm border border-gray-100">
-            <div className="text-xs text-gray-500 font-bold mb-2">
-              STRUK PEMESANAN KANTINKU
-            </div>
-            {struk.items.map((item, idx) => (
-              <div key={idx} className="flex justify-between">
-                <span>
-                  {item.nama} x{item.jumlah}
-                </span>
-                <span className="font-semibold">
-                  Rp {(item.harga * item.jumlah).toLocaleString("id-ID")}
-                </span>
-              </div>
-            ))}
-            <hr className="border-gray-200" />
-            <div className="flex justify-between">
-              <span>Subtotal:</span>
-              <span>Rp {struk.subtotal.toLocaleString("id-ID")}</span>
-            </div>
-            {struk.diskon > 0 && (
-              <div className="flex justify-between text-emerald-600">
-                <span>Diskon:</span>
-                <span>- Rp {struk.diskon.toLocaleString("id-ID")}</span>
-              </div>
-            )}
-            <div className="flex justify-between">
-              <span>Pengiriman:</span>
-              <span className="font-semibold">
-                {struk.tipe === "Diantar"
-                  ? `Ongkir antar ke ${struk.kelas}: Rp 2.000`
-                  : "Diambil sendiri di kantin"}
-              </span>
-            </div>
-            <hr className="border-gray-200" />
-            <div className="flex justify-between font-extrabold text-base text-orange-600">
-              <span>Total bayar:</span>
-              <span>Rp {struk.total.toLocaleString("id-ID")}</span>
-            </div>
+      <main className="max-w-4xl mx-auto py-16 px-4 text-center">
+        <div className="bg-white rounded-3xl border border-gray-200 shadow-sm p-10 max-w-lg mx-auto space-y-4">
+          <div className="w-16 h-16 bg-emerald-100 text-emerald-600 rounded-full flex items-center justify-center text-3xl mx-auto">
+            ✅
           </div>
-
-          <button
-            onClick={() => setStruk(null)}
-            className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl shadow transition"
-          >
-            Selesai / Kembali Belanja
-          </button>
+          <h2 className="text-2xl font-black text-gray-900">
+            Pesanan Berhasil!
+          </h2>
+          <p className="text-sm text-gray-500">
+            Terima kasih, pesananmu sudah dicatat di Riwayat Pesanan.
+          </p>
+          <div className="pt-4 flex gap-3 justify-center">
+            <Link
+              href="/riwayat"
+              className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-6 py-3 rounded-xl text-sm transition"
+            >
+              Lihat Riwayat &rarr;
+            </Link>
+            <Link
+              href="/menu"
+              className="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold px-6 py-3 rounded-xl text-sm transition"
+            >
+              Belanja Lagi
+            </Link>
+          </div>
         </div>
       </main>
     );
   }
-
-  const effectiveDiskon = subtotal < 20000 ? 0 : diskon;
 
   return (
     <main className="max-w-4xl mx-auto py-8 px-4">
@@ -244,18 +135,14 @@ export default function KeranjangPage() {
 
       {cart.length === 0 ? (
         <div className="bg-white rounded-3xl border border-dashed border-gray-300 p-12 text-center shadow-sm">
-          <span className="text-6xl mb-3 inline-block">🛒</span>
-          <h2 className="text-xl font-bold text-gray-800 mb-1">
-            Keranjang masih kosong.
-          </h2>
-          <p className="text-gray-500 text-sm mb-6">
-            Belum ada menu yang ditambahkan ke keranjang.
+          <p className="text-gray-500 text-base font-medium mb-4">
+            Keranjangmu masih kosong.
           </p>
           <Link
             href="/menu"
-            className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-6 py-3 rounded-xl text-sm transition shadow inline-block"
+            className="bg-orange-500 hover:bg-orange-600 text-white font-bold px-6 py-3 rounded-xl text-sm shadow inline-block transition"
           >
-            &larr; Pilih Menu Sekarang
+            Mulai Belanja &rarr;
           </Link>
         </div>
       ) : (
@@ -264,45 +151,46 @@ export default function KeranjangPage() {
             {cart.map((item) => {
               const menuItem = menu.find((m) => m.id === item.id);
               if (!menuItem) return null;
+
               return (
                 <div
                   key={item.id}
                   className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex items-center justify-between gap-4"
                 >
                   <div>
-                    <h3 className="font-bold text-gray-900">{menuItem.nama}</h3>
-                    <p className="text-sm font-black text-orange-600">
+                    <h2 className="font-bold text-gray-900 text-base">
+                      {menuItem.nama}
+                    </h2>
+                    <p className="text-xs text-orange-600 font-black mt-1">
                       Rp {menuItem.harga.toLocaleString("id-ID")}
-                    </p>
-                    <p className="text-xs text-gray-400 mt-0.5">
-                      Subtotal: Rp{" "}
-                      {(menuItem.harga * item.jumlah).toLocaleString("id-ID")}
                     </p>
                   </div>
 
                   <div className="flex items-center gap-3">
-                    <div className="flex items-center border border-gray-300 rounded-xl p-1">
+                    <div className="flex items-center gap-1 border border-gray-300 rounded-xl p-1">
                       <button
                         onClick={() => updateJumlah(item.id, -1)}
-                        className="w-7 h-7 bg-gray-100 hover:bg-gray-200 rounded-lg font-bold text-gray-700"
+                        className="w-7 h-7 bg-gray-100 font-bold rounded-lg text-xs"
                       >
                         -
                       </button>
-                      <span className="w-8 text-center font-bold text-sm">
+                      <span className="w-8 text-center text-xs font-bold">
                         {item.jumlah}
                       </span>
                       <button
                         onClick={() => updateJumlah(item.id, 1)}
-                        className="w-7 h-7 bg-gray-100 hover:bg-gray-200 rounded-lg font-bold text-gray-700"
+                        className="w-7 h-7 bg-gray-100 font-bold rounded-lg text-xs"
                       >
                         +
                       </button>
                     </div>
+
                     <button
-                      onClick={() => hapusItem(item.id)}
-                      className="text-rose-500 hover:text-rose-700 font-bold text-sm px-2 py-1"
+                      onClick={() => removeItem(item.id)}
+                      className="text-rose-500 hover:text-rose-700 font-bold text-sm p-2"
+                      title="Hapus"
                     >
-                      Hapus
+                      🗑️
                     </button>
                   </div>
                 </div>
@@ -310,134 +198,67 @@ export default function KeranjangPage() {
             })}
           </div>
 
-          <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm space-y-6 h-fit">
-            <h2 className="font-bold text-lg text-gray-900 border-b pb-3">
+          <div className="bg-white p-6 rounded-3xl border border-gray-200 shadow-sm h-fit space-y-4">
+            <h2 className="font-extrabold text-gray-900 text-lg border-b pb-3">
               Ringkasan Pesanan
             </h2>
-
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-700">
-                Kode Promo
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  placeholder="Cth: HEMAT10"
-                  value={promoKode}
-                  onChange={(e) => setPromoKode(e.target.value)}
-                  className="border border-gray-300 text-gray-900 p-2 text-xs rounded-xl flex-1 outline-none uppercase bg-white"
-                />
-                <button
-                  onClick={handleTerapkanPromo}
-                  className="bg-gray-900 hover:bg-gray-800 text-white text-xs font-bold px-3 py-2 rounded-xl transition"
-                >
-                  Pakai
-                </button>
-              </div>
-              {pesanPromo && (
-                <p
-                  className={`text-[11px] font-semibold ${pesanPromo.tipe === "sukses" ? "text-emerald-600" : "text-rose-600"}`}
-                >
-                  {pesanPromo.teks}
-                </p>
-              )}
+            <div className="flex justify-between text-sm font-semibold text-gray-600">
+              <span>Total Harga:</span>
+              <span className="text-orange-600 font-black text-base">
+                Rp {totalHarga.toLocaleString("id-ID")}
+              </span>
             </div>
 
-            <div className="space-y-2">
-              <label className="text-xs font-bold text-gray-700">
-                Cara Ambil
-              </label>
-              <div className="flex gap-4 text-xs font-medium">
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="tipe"
-                    checked={tipePengiriman === "pickup"}
-                    onChange={() => setTipePengiriman("pickup")}
-                  />
-                  Ambil sendiri
-                </label>
-                <label className="flex items-center gap-1.5 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="tipe"
-                    checked={tipePengiriman === "delivery"}
-                    onChange={() => setTipePengiriman("delivery")}
-                  />
-                  Diantar (+Rp 2.000)
-                </label>
-              </div>
-            </div>
-
-            <div className="space-y-3">
+            <form onSubmit={handleCheckout} className="space-y-3 pt-2">
               <div>
-                <label className="text-xs font-bold text-gray-700">
-                  Nama Pemesan (Min. 3 huruf)
+                <label className="text-xs font-bold text-gray-700 block mb-1">
+                  Nama Pemesan
                 </label>
                 <input
                   type="text"
-                  placeholder="Nama lengkap..."
-                  value={namaPemesan}
-                  onChange={(e) => setNamaPemesan(e.target.value)}
-                  className="w-full border border-gray-300 text-gray-900 p-2 text-xs rounded-xl mt-1 outline-none bg-white"
+                  required
+                  placeholder="Masukkan nama..."
+                  value={nama}
+                  onChange={(e) => setNama(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs outline-none bg-white text-gray-900"
                 />
               </div>
-              {tipePengiriman === "delivery" && (
-                <div>
-                  <label className="text-xs font-bold text-gray-700">
-                    Kelas / Lokasi
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Contoh: XII IPA 1"
-                    value={kelasPemesan}
-                    onChange={(e) => setKelasPemesan(e.target.value)}
-                    className="w-full border border-gray-300 text-gray-900 p-2 text-xs rounded-xl mt-1 outline-none bg-white"
-                  />
-                </div>
-              )}
-            </div>
 
-            <div className="space-y-2 pt-3 border-t text-xs font-medium text-gray-600">
-              <div className="flex justify-between">
-                <span>Subtotal</span>
-                <span>Rp {subtotal.toLocaleString("id-ID")}</span>
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">
+                  Kelas
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="Contoh: XII IPA 1"
+                  value={kelas}
+                  onChange={(e) => setKelas(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs outline-none bg-white text-gray-900"
+                />
               </div>
-              {effectiveDiskon > 0 && (
-                <div className="flex justify-between text-emerald-600 font-semibold">
-                  <span>Diskon</span>
-                  <span>- Rp {effectiveDiskon.toLocaleString("id-ID")}</span>
-                </div>
-              )}
-              {tipePengiriman === "delivery" && (
-                <div className="flex justify-between">
-                  <span>Ongkir</span>
-                  <span>Rp 2.000</span>
-                </div>
-              )}
-              <div className="flex justify-between text-base font-extrabold text-gray-900 pt-2 border-t">
-                <span>Total</span>
-                <span className="text-orange-600">
-                  Rp{" "}
-                  {(subtotal - effectiveDiskon + ongkir).toLocaleString(
-                    "id-ID",
-                  )}
-                </span>
+
+              <div>
+                <label className="text-xs font-bold text-gray-700 block mb-1">
+                  Tipe Pesanan
+                </label>
+                <select
+                  value={tipe}
+                  onChange={(e) => setTipe(e.target.value)}
+                  className="w-full border border-gray-300 rounded-xl px-3 py-2 text-xs outline-none bg-white text-gray-900"
+                >
+                  <option value="Ambil Sendiri">Ambil Sendiri</option>
+                  <option value="Antar ke Kelas">Antar ke Kelas</option>
+                </select>
               </div>
-            </div>
 
-            {pesanCheckout && (
-              <p className="text-[11px] font-semibold text-rose-600">
-                {pesanCheckout.teks}
-              </p>
-            )}
-
-            <button
-              onClick={handlePesanSekarang}
-              className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl shadow-md transition text-sm"
-            >
-              Pesan sekarang
-            </button>
+              <button
+                type="submit"
+                className="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl text-xs transition shadow-md mt-4"
+              >
+                Checkout Pesanan
+              </button>
+            </form>
           </div>
         </div>
       )}

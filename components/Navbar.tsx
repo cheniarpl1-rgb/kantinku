@@ -6,19 +6,12 @@ import { useState, useEffect, Suspense } from "react";
 
 function NavLinks() {
   const pathname = usePathname();
-
-  const [cartCount, setCartCount] = useState<number>(() => {
-    try {
-      const saved = localStorage.getItem("keranjang");
-      if (saved) {
-        const cart: { jumlah: number }[] = JSON.parse(saved);
-        return cart.reduce((acc, item) => acc + item.jumlah, 0);
-      }
-    } catch {}
-    return 0;
-  });
+  const [cartCount, setCartCount] = useState<number>(0);
+  const [mounted, setMounted] = useState<boolean>(false);
 
   useEffect(() => {
+    setMounted(true); // Menandakan bahwa komponen sudah aktif di client
+
     const updateCartCount = () => {
       try {
         const saved = localStorage.getItem("keranjang");
@@ -34,6 +27,7 @@ function NavLinks() {
       }
     };
 
+    updateCartCount();
     window.addEventListener("keranjang-berubah", updateCartCount);
     return () => {
       window.removeEventListener("keranjang-berubah", updateCartCount);
@@ -43,8 +37,9 @@ function NavLinks() {
   const navLinks = [
     { name: "Beranda", href: "/" },
     { name: "Menu", href: "/menu" },
+    // Angka keranjang hanya akan digabung setelah mounted di client (mencegah hydration error)
     {
-      name: `Keranjang ${cartCount > 0 ? `(${cartCount})` : ""}`,
+      name: `Keranjang ${mounted && cartCount > 0 ? `(${cartCount})` : ""}`,
       href: "/keranjang",
     },
     { name: "Favorit", href: "/favorit" },
@@ -86,9 +81,7 @@ export default function Navbar() {
           </Link>
 
           <Suspense
-            fallback={
-              <div className="text-xs text-gray-400">Memuat navigasi...</div>
-            }
+            fallback={<div className="text-xs text-gray-400">Memuat...</div>}
           >
             <NavLinks />
           </Suspense>
