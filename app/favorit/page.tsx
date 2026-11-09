@@ -23,8 +23,12 @@ export default function FavoritPage() {
           const favIds: number[] = JSON.parse(savedFav);
           setFavoritList(allMenu.filter((item) => favIds.includes(item.id)));
         }
-      } catch (err: any) {
-        setError(err.message || "Terjadi kesalahan.");
+      } catch (err: unknown) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError("Terjadi kesalahan.");
+        }
       } finally {
         setLoading(false);
       }

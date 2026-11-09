@@ -3,9 +3,10 @@ import { menu } from "@/data/menu";
 
 export async function GET(
   request: Request,
-  { params }: { params: { id: string } },
+  { params }: { params: Promise<{ id: string }> },
 ) {
-  const idNum = Number(params.id);
+  const resolvedParams = await params;
+  const idNum = Number(resolvedParams.id);
   const item = menu.find((m) => m.id === idNum);
 
   if (!item) {

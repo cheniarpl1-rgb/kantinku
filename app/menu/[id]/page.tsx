@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, Suspense } from "react";
+import { useState, Suspense } from "react";
 import Link from "next/link";
 import { menu } from "@/data/menu";
 import { useParams } from "next/navigation";
@@ -15,19 +15,20 @@ function DetailContent() {
     tipe: "sukses" | "error";
     teks: string;
   } | null>(null);
-  const [isFavorit, setIsFavorit] = useState<boolean>(false);
 
-  useEffect(() => {
+  // Inisialisasi status favorit langsung dari localStorage
+  const [isFavorit, setIsFavorit] = useState<boolean>(() => {
     if (menuItem) {
       try {
         const savedFav = localStorage.getItem("favorit");
         if (savedFav) {
           const favIds: number[] = JSON.parse(savedFav);
-          setIsFavorit(favIds.includes(menuItem.id));
+          return favIds.includes(menuItem.id);
         }
       } catch {}
     }
-  }, [menuItem]);
+    return false;
+  });
 
   const toggleFavorit = () => {
     if (!menuItem) return;

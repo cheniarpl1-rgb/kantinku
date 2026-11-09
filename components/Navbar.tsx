@@ -1,77 +1,98 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useEffect } from "react";
+import { usePathname } from "next/navigation";
+import { useState, useEffect, Suspense } from "react";
 
-export default function Navbar() {
-  const [totalItem, setTotalItem] = useState(0);
+function NavLinks() {
+  const pathname = usePathname();
 
-  const updateCartCount = () => {
+  const [cartCount, setCartCount] = useState<number>(() => {
     try {
-      const existing = localStorage.getItem("keranjang");
-      if (existing) {
-        const cart = JSON.parse(existing);
-        // Menghitung total jumlah kuantitas semua item di keranjang
-        const count = cart.reduce(
-          (acc: number, item: { jumlah: number }) => acc + item.jumlah,
-          0,
-        );
-        setTotalItem(count);
-      } else {
-        setTotalItem(0);
+      const saved = localStorage.getItem("keranjang");
+      if (saved) {
+        const cart: { jumlah: number }[] = JSON.parse(saved);
+        return cart.reduce((acc, item) => acc + item.jumlah, 0);
       }
-    } catch {
-      setTotalItem(0);
-    }
-  };
+    } catch {}
+    return 0;
+  });
 
   useEffect(() => {
-    // Ambil data saat pertama kali komponen dimuat
-    updateCartCount();
+    const updateCartCount = () => {
+      try {
+        const saved = localStorage.getItem("keranjang");
+        if (saved) {
+          const cart: { jumlah: number }[] = JSON.parse(saved);
+          const total = cart.reduce((acc, item) => acc + item.jumlah, 0);
+          setCartCount(total);
+        } else {
+          setCartCount(0);
+        }
+      } catch {
+        setCartCount(0);
+      }
+    };
 
-    // Dengarkan event kustom saat keranjang berubah
     window.addEventListener("keranjang-berubah", updateCartCount);
-
     return () => {
       window.removeEventListener("keranjang-berubah", updateCartCount);
     };
   }, []);
 
-  return (
-    <header className="bg-white border-b border-gray-100 sticky top-0 z-50 shadow-xs">
-      <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
-        <Link
-          href="/"
-          className="font-black text-xl text-orange-600 tracking-tight"
-        >
-          KantinKu
-        </Link>
+  const navLinks = [
+    { name: "Beranda", href: "/" },
+    { name: "Menu", href: "/menu" },
+    {
+      name: `Keranjang ${cartCount > 0 ? `(${cartCount})` : ""}`,
+      href: "/keranjang",
+    },
+    { name: "Favorit", href: "/favorit" },
+    { name: "Riwayat", href: "/riwayat" },
+  ];
 
-        <nav className="flex items-center gap-6 text-sm font-semibold text-gray-600">
-          <Link href="/" className="hover:text-orange-600 transition">
-            Beranda
-          </Link>
-          <Link href="/menu" className="hover:text-orange-600 transition">
-            Menu
-          </Link>
-          <Link href="/favorit" className="hover:text-orange-600 transition">
-            Favorit
-          </Link>
+  return (
+    <nav className="flex items-center gap-1 sm:gap-2">
+      {navLinks.map((link) => {
+        const isActive = pathname === link.href;
+        return (
           <Link
-            href="/keranjang"
-            className="hover:text-orange-600 transition relative flex items-center gap-1"
+            key={link.href}
+            href={link.href}
+            className={`px-3 py-2 rounded-xl text-xs sm:text-sm font-bold transition-all ${
+              isActive
+                ? "bg-orange-500 text-white shadow-sm shadow-orange-500/30"
+                : "text-gray-600 hover:bg-gray-100 hover:text-gray-900"
+            }`}
           >
-            Keranjang
-            {totalItem > 0 && (
-              <span className="bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
-                {totalItem}
-              </span>
-            )}
+            {link.name}
           </Link>
-          <Link href="/riwayat" className="hover:text-orange-600 transition">
-            Riwayat
+        );
+      })}
+    </nav>
+  );
+}
+
+export default function Navbar() {
+  return (
+    <header className="sticky top-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 shadow-sm">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="flex items-center justify-between h-16">
+          <Link href="/" className="flex items-center gap-2">
+            <span className="text-2xl">🍲</span>
+            <span className="font-extrabold text-xl text-gray-900 tracking-tight">
+              Kantin<span className="text-orange-500">Ku</span>
+            </span>
           </Link>
-        </nav>
+
+          <Suspense
+            fallback={
+              <div className="text-xs text-gray-400">Memuat navigasi...</div>
+            }
+          >
+            <NavLinks />
+          </Suspense>
+        </div>
       </div>
     </header>
   );

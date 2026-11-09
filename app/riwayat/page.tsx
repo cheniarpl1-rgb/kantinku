@@ -1,21 +1,33 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import Link from "next/link";
 
-export default function RiwayatPage() {
-  const [riwayatList, setRiwayatList] = useState<any[]>([]);
+interface RiwayatItem {
+  nama: string;
+  jumlah: number;
+  harga: number;
+}
 
-  useEffect(() => {
+interface Pesanan {
+  tanggal: string;
+  nama: string;
+  kelas?: string;
+  tipe: string;
+  items: RiwayatItem[];
+  total: number;
+}
+
+export default function RiwayatPage() {
+  // Inisialisasi riwayat langsung dari localStorage
+  const [riwayatList] = useState<Pesanan[]>(() => {
     try {
       const saved = localStorage.getItem("riwayat");
-      if (saved) {
-        setRiwayatList(JSON.parse(saved));
-      }
+      return saved ? JSON.parse(saved) : [];
     } catch {
-      setRiwayatList([]);
+      return [];
     }
-  }, []);
+  });
 
   const totalBelanjaKeseluruhan = riwayatList.reduce(
     (acc, curr) => acc + curr.total,
@@ -64,7 +76,7 @@ export default function RiwayatPage() {
                 Pemesan: {pesanan.nama} {pesanan.kelas && `(${pesanan.kelas})`}
               </div>
               <div className="space-y-1 text-xs text-gray-600">
-                {pesanan.items.map((i: any, iIdx: number) => (
+                {pesanan.items.map((i, iIdx) => (
                   <div key={iIdx} className="flex justify-between">
                     <span>
                       {i.nama} x{i.jumlah}
