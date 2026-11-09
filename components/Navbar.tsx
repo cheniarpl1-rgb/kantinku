@@ -1,71 +1,76 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 
 export default function Navbar() {
-  const [totalItems, setTotalItems] = useState<number>(0);
+  const [totalItem, setTotalItem] = useState(0);
 
-  const hitungTotal = () => {
+  const updateCartCount = () => {
     try {
-      const saved = localStorage.getItem("keranjang");
-      if (saved) {
-        const parsed = JSON.parse(saved);
-        const count = parsed.reduce(
+      const existing = localStorage.getItem("keranjang");
+      if (existing) {
+        const cart = JSON.parse(existing);
+        // Menghitung total jumlah kuantitas semua item di keranjang
+        const count = cart.reduce(
           (acc: number, item: { jumlah: number }) => acc + item.jumlah,
           0,
         );
-        setTotalItems(count);
+        setTotalItem(count);
       } else {
-        setTotalItems(0);
+        setTotalItem(0);
       }
     } catch {
-      setTotalItems(0);
+      setTotalItem(0);
     }
   };
 
   useEffect(() => {
-    hitungTotal();
-    const handleStorageChange = () => hitungTotal();
-    window.addEventListener("keranjang-berubah", handleStorageChange);
-    window.addEventListener("storage", handleStorageChange);
+    // Ambil data saat pertama kali komponen dimuat
+    updateCartCount();
+
+    // Dengarkan event kustom saat keranjang berubah
+    window.addEventListener("keranjang-berubah", updateCartCount);
 
     return () => {
-      window.removeEventListener("keranjang-berubah", handleStorageChange);
-      window.removeEventListener("storage", handleStorageChange);
+      window.removeEventListener("keranjang-berubah", updateCartCount);
     };
   }, []);
 
-  const navLinks = [
-    { name: "Beranda", href: "/" },
-    { name: "Menu", href: "/menu" },
-    { name: "Favorit", href: "/favorit" },
-    {
-      name: `Keranjang${totalItems > 0 ? ` (${totalItems})` : ""}`,
-      href: "/keranjang",
-    },
-    { name: "Riwayat", href: "/riwayat" },
-  ];
-
   return (
-    <header className="bg-white shadow-sm sticky top-0 z-50 border-b border-gray-100">
-      <div className="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center">
+    <header className="bg-white border-b border-gray-100 sticky top-0 z-50 shadow-xs">
+      <div className="max-w-6xl mx-auto px-4 h-16 flex items-center justify-between">
         <Link
           href="/"
-          className="font-bold text-2xl text-orange-600 tracking-wide"
+          className="font-black text-xl text-orange-600 tracking-tight"
         >
           KantinKu
         </Link>
-        <nav className="flex gap-2 sm:gap-4 items-center">
-          {navLinks.map((link) => (
-            <Link
-              key={link.href}
-              href={link.href}
-              className="px-3.5 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-orange-50 hover:text-orange-600 transition"
-            >
-              {link.name}
-            </Link>
-          ))}
+
+        <nav className="flex items-center gap-6 text-sm font-semibold text-gray-600">
+          <Link href="/" className="hover:text-orange-600 transition">
+            Beranda
+          </Link>
+          <Link href="/menu" className="hover:text-orange-600 transition">
+            Menu
+          </Link>
+          <Link href="/favorit" className="hover:text-orange-600 transition">
+            Favorit
+          </Link>
+          <Link
+            href="/keranjang"
+            className="hover:text-orange-600 transition relative flex items-center gap-1"
+          >
+            Keranjang
+            {totalItem > 0 && (
+              <span className="bg-orange-500 text-white text-[10px] font-bold px-1.5 py-0.5 rounded-full">
+                {totalItem}
+              </span>
+            )}
+          </Link>
+          <Link href="/riwayat" className="hover:text-orange-600 transition">
+            Riwayat
+          </Link>
         </nav>
       </div>
     </header>
